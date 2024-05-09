@@ -1,0 +1,292 @@
+---
+title: "Petro Analysis"
+author: "Shelby Ziegler"
+date: "2023-09-12"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error=FALSE, fig.width=14, fig.height=10, out.width = "75%")
+
+rm(list = ls());graphics.off()
+library(tidyverse) # For data manipulation and summarization
+library(plotrix) #To use standard error calculation
+library(cowplot) #For grouping plots
+library(scales) #For editing axis scales
+library(vegan) #For multivariate analyses
+library(rstatix) #For running ANCOVA
+library(ggpmisc) #adding equation and r2 to figures
+library(viridis)
+library(ggpubr)
+library(visreg)
+library(MuMIn)
+
+
+alpha=0.05
+formula<-y~x
+theme_set(theme_classic(base_size=16))
+```
+
+
+Examine the environmental correlates with the invasive green porcelain crab. *Including 9 sites within Georgia Coastal Ecosystem LTER domain.
+
+``````{r} 
+petro<-read.csv("Data/AllPetroDataCombined.csv")
+
+str(petro)
+
+petro$Cluster<-factor(petro$Cluster, levels=c("Tybee", "Romerly Marsh", "Little Ogeechee", "Liberty-Sunbury", "McIntosh", "High Point", "Meridian", "Dean Creek", "McKay River", "Glynn-Jointer Creek", "Camden"))
+
+p1<-petro%>%
+  dplyr::select(Latitude, Rugosity, Total.oyster.density, Total.mudcrab.density, Petro.density, Temp, Salinity, Marsh.water.ratio, Nearest.Inlet, Nearest.road, Neartest.Armored.Shoreline)
+
+corrplot::corrplot(cor(p1),method="number", type="upper")
+
+#model diagnostics
+library(vcd)
+ggplot(petro, aes(Petro.density)) + geom_histogram() 
+
+#Use Ord_plot to determine distribution type for models
+pfit<-goodfit(petro$Petro.density, type="nbinomial", method="MinChisq" )
+plot(pfit, main="nbinomial")
+summary(pfit) #Weird output (due to NAs produced - verify with JMP)
+
+Ord_plot(petro$Petro.density) #Tells us negative binomial is the best distribution.
+
+```
+
+Visually examine relationships between petro and other variables
+
+```{r}
+library(MASS)
+
+#Latitude
+ggplot(petro, aes(x=Latitude, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Latitude", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Rugosity
+ggplot(petro, aes(x=Rugosity, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Rugosity", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Oyster density
+ggplot(petro, aes(x=Total.oyster.density, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Oyster density", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#mud crab density
+ggplot(petro, aes(x=Total.mudcrab.density, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+   geom_smooth(method="glm.nb", color="black")+
+  labs(x="Mud crab density", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Salinity
+ggplot(petro, aes(x=Salinity, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Salinity", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Temp
+ggplot(petro, aes(x=Temp, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Temperature", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Inlet
+ggplot(petro, aes(x=Nearest.Inlet, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Nearest Ocean Inlet (km)", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Road
+ggplot(petro, aes(x=Nearest.road, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Nearest road (km)", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Marsh water ratio
+ggplot(petro, aes(x=Marsh.water.ratio, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Marsh:Water", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Freshwater input
+ggplot(petro, aes(x=Freshwater.input, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Nearest freshwater input", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+
+#Altamaha
+ggplot(petro, aes(x=Linear.dist.from.Altamaha, y=Petro.density))+
+  geom_point(shape=21,size=3, aes(fill=Cluster))+
+  scale_fill_viridis_d()+
+  geom_smooth(method="glm.nb", color="black")+
+  labs(x="Distance from largest freshwater input (Altamaha)", y=expression(paste(italic(Petrolithes~armatus)~density~(0.25~m^2))))+
+  theme(panel.border = element_rect(color = "black", fill=NA))
+```
+
+Conduct negative binomial models 
+
+```{r}
+#Models 
+library(lme4)
+library(MASS)
+
+
+#First examine relationship with latitude
+petrolat<-MASS::glm.nb(Petro.density~Latitude,  data=petro, na.action=na.fail)
+summary(petrolat) ## Petro positively correlated
+r.squaredGLMM(petrolat)
+#Examine if the latitude model is a better predictor of Petro than random chance (null model) using the analysis of deviance.
+anova(petrolat)
+car::Anova(petrolat) #checking second method for deviance anlaysis
+
+#Visualize the model output for petro and latitude
+visreg(petrolat)
+
+
+#Run full model for petro.
+petroall<-MASS::glm.nb(Petro.density~scale(Salinity)+scale(Rugosity)+scale(Total.oyster.density)+scale(Total.mudcrab.density)+scale(Nearest.Inlet)+scale(Nearest.road),  data=petro, na.action=na.fail)
+
+ggplot(petro, aes(x= Total.mudcrab.density, y=Petro.density))+
+  geom_point()
+
+#Use the dredge function from MuMIn to examine all possible model combinations.
+x1<-dredge(petroall, "partial.sd", extra =list(R2 = function(x)     {
+  r.squaredGLMM(x, null = nullmodel)["delta", ]}))
+#Subset out models with delta AIC < 2
+subset(x1,delta <= 2, recalc.weights = FALSE)
+
+#Conduct model averaging to determine the most important variables in the top models.
+summary(model.avg(subset(x1,delta <= 2, recalc.weights = FALSE)))
+
+
+## R ^2 range 0.23-0.29x
+###model averaging --- mud crabs top fit. 
+
+#Examine mud crab only model and look at visualization of model output with visreg
+p1<-MASS::glm.nb(Petro.density~Total.mudcrab.density,  data=petro, na.action=na.fail)
+ visreg(p1, ylab="P(Petro density)",type="conditional", scale="response", partial=TRUE)
+ 
+#Examine mud crab and rugosity model and look at visualization of model output with visreg 
+p2<-MASS::glm.nb(Petro.density~scale(Total.mudcrab.density)+scale(Rugosity),  data=petro, na.action=na.fail)
+
+summary(p2)
+par(mfrow=c(1,2))
+ visreg(p2, ylab="P(Petro density)",type="conditional", scale="response", partial=TRUE )
+ par(mfrow=c(1,1))
+``` 
+ 
+ 
+ 
+```{r} 
+#Remove potential outliers and run models again to ensure robustness. Remove mud crab density > 140 per 0.25m2^2
+petrosub<-petro%>%
+  filter(Total.mudcrab.density<140)
+
+petrosuball<-MASS::glm.nb(Petro.density~scale(Salinity)+scale(Rugosity)+scale(Total.oyster.density)+scale(Total.mudcrab.density)+scale(Nearest.Inlet)+scale(Nearest.road),  data=petrosub, na.action=na.fail)
+
+x2<-dredge(petrosuball, "partial.sd", extra =list(R2 = function(x)     {
+  r.squaredGLMM(x, null = nullmodel)["delta", ]}))
+subset(x2,delta <= 2, recalc.weights = FALSE)
+
+summary(model.avg(subset(x2,delta <= 2, recalc.weights = FALSE)))
+
+### Mud crab still come out as top model (R2 = 0.18)
+
+#Run best fit model for visualization
+ps1<-MASS::glm.nb(Petro.density~Total.mudcrab.density,  data=petrosub, na.action=na.fail)
+ 
+#Visualize output
+visreg(ps1, ylab="P(Petro density)",type="conditional", scale="response", partial=TRUE)
+
+```
+
+Try running models with large and small mud crabs separated out
+
+```{r}
+# Data fram with large (>10mm) and small (<10mm) mud crabs in separate columns for 24 of 33 reefs 
+x<-read.csv("Data/CIGOysterAllCombinedWideFormat.csv")%>%
+  dplyr::select(Site, large.mudcrab.density, Small.mudcrab.density)
+
+
+## Crabs from the three sapelo clusters did not get separated into large and small. Using measurements from each sample we calcualted the proportion of the total sample that would be large vs small and then created large vs small categories. 
+mud2<-petro%>%
+  filter(Cluster=="High Point" | Cluster=="Meridian" |Cluster=="Dean Creek")
+mp<-read.csv("Data/MP-mudprop.csv")
+
+mud3<-left_join(mud2, mp, by="Site")
+
+mud3$large.mudcrab.density<-(mud3$Total.mudcrab.density*(1-mud3$Prop))
+mud3$Small.mudcrab.density<-(mud3$Total.mudcrab.density*(mud3$Prop))
+
+mud3$large.mudcrab.density<-round(mud3$large.mudcrab.density)
+mud3$Small.mudcrab.density<-round(mud3$Small.mudcrab.density)
+
+mud3<-mud3%>%
+  dplyr::select(Site, large.mudcrab.density, Small.mudcrab.density)
+
+#Combine calculated large vs small data with the rest of the sites. 
+mudx<-rbind(x, mud3)
+
+petro<-left_join(petro, mudx, by="Site")
+
+
+#rerun model with large and small mudcrabs 
+petroall1<-MASS::glm.nb(Petro.density~scale(Salinity)+scale(Rugosity)+scale(Total.oyster.density)+scale(large.mudcrab.density)+scale(Small.mudcrab.density)+scale(Nearest.Inlet)+scale(Nearest.road),  data=petro, na.action=na.fail)
+
+x3<-dredge(petroall1, "partial.sd", extra =list(R2 = function(x)     {
+  r.squaredGLMM(x, null = nullmodel)["delta", ]}))
+
+subset(x3,delta <= 2, recalc.weights = FALSE)
+
+summary(model.avg(subset(x3,delta <= 2, recalc.weights = FALSE)))
+
+sm1<-MASS::glm.nb(Petro.density~scale(Small.mudcrab.density),  data=petro, na.action=na.fail)
+lg1<-MASS::glm.nb(Petro.density~scale(large.mudcrab.density),  data=petro, na.action=na.fail)
+
+visreg(sm1)
+visreg(lg1)
+```
+
+
+Calculate mean Petro lengths
+
+```{r}
+sp<-read.csv("Data/ReefSpecies-2023-02-06.csv")
+
+psp<-sp%>%
+  filter(species.ds=="petro")%>%
+  select(Site, c(X1:X20))%>%
+  gather(Count, Size, -Site)
+
+pspm<-psp%>%
+  summarize(meanp=mean(Size, na.rm=T), se=std.error(Size, na.rm=T))
+```
